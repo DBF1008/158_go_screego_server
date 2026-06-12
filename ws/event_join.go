@@ -2,6 +2,8 @@ package ws
 
 import (
 	"fmt"
+
+	"github.com/rs/zerolog/log"
 )
 
 func init() {
@@ -46,7 +48,11 @@ func (e *Join) Execute(rooms *Rooms, current ClientInfo) error {
 
 	v4, v6, err := rooms.config.TurnIPProvider.Get()
 	if err != nil {
-		return err
+		log.Warn().Err(err).
+			Str("user", current.ID.String()).
+			Str("room", room.ID).
+			Msg("failed to resolve TURN addresses during join, skipping sessions for existing streams")
+		return nil
 	}
 
 	for _, user := range room.Users {
