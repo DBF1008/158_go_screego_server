@@ -91,6 +91,52 @@ func (r *Room) closeSession(rooms *Rooms, id xid.ID) {
 	sessionClosedTotal.Inc()
 }
 
+// closeHostSessions closes all sessions where the given user is the host (i.e. the
+// user is sharing their screen). Each affected client peer is notified via EndShare.
+// Sessions where the user is a client (viewing someone else's share) are left intact.
+func (r *Room) closeHostSessions(rooms *Rooms, userID xid.ID) {
+	for id, session := range r.Sessions {
+		if session.Host == userID {
+			if client, ok := r.Users[session.Client]; ok {
+				client.WriteTimeout(outgoing.EndShare(id))
+			}
+			r.closeSession(rooms, id)
+		}
+	}
+}
+
+// closeUserSessions closes all sessions where the given user participates as host or
+// client. The peer on the other end of each session is notified via EndShare.
+func (r *Room) closeUserSessions(rooms *Rooms, userID xid.ID) {
+	for id, session := range r.Sessions {
+		if session.Host == userID {
+			if client, ok := r.Users[session.Client]; ok {
+				client.WriteTimeout(outgoing.EndShare(id))
+			}
+			r.closeSession(rooms, id)
+		} else if session.Client == userID {
+			if host, ok := r.Users[session.Host]; ok {
+				host.WriteTimeout(outgoing.EndShare(id))
+			}
+			r.closeSession(rooms, id)
+		}
+	}
+}
+
+// closeAllSessions closes every session in the room. Both the host and client of each
+// session are notified via EndShare if they are still present in the room.
+func (r *Room) closeAllSessions(rooms *Rooms) {
+	for id, session := range r.Sessions {
+		if host, ok := r.Users[session.Host]; ok {
+			host.WriteTimeout(outgoing.EndShare(id))
+		}
+		if client, ok := r.Users[session.Client]; ok {
+			client.WriteTimeout(outgoing.EndShare(id))
+		}
+		r.closeSession(rooms, id)
+	}
+}
+
 type RoomSession struct {
 	Host   xid.ID
 	Client xid.ID

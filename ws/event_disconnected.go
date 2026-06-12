@@ -1,8 +1,6 @@
 package ws
 
 import (
-	"bytes"
-
 	"github.com/gorilla/websocket"
 	"github.com/screego/server/ws/outgoing"
 )
@@ -42,22 +40,7 @@ func (e *Disconnected) executeNoError(rooms *Rooms, current ClientInfo) {
 	delete(room.Users, current.ID)
 	usersLeftTotal.Inc()
 
-	for id, session := range room.Sessions {
-		if bytes.Equal(session.Client.Bytes(), current.ID.Bytes()) {
-			host, ok := room.Users[session.Host]
-			if ok {
-				host.WriteTimeout(outgoing.EndShare(id))
-			}
-			room.closeSession(rooms, id)
-		}
-		if bytes.Equal(session.Host.Bytes(), current.ID.Bytes()) {
-			client, ok := room.Users[session.Client]
-			if ok {
-				client.WriteTimeout(outgoing.EndShare(id))
-			}
-			room.closeSession(rooms, id)
-		}
-	}
+	room.closeUserSessions(rooms, current.ID)
 
 	if user.Owner && room.CloseOnOwnerLeave {
 		for _, member := range room.Users {
