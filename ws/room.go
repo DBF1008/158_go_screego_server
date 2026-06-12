@@ -91,9 +91,48 @@ func (r *Room) closeSession(rooms *Rooms, id xid.ID) {
 	sessionClosedTotal.Inc()
 }
 
+// closeUserSessions tears down the sessions a user takes part in and notifies the
+// surviving peer of each closed session with EndShare. When hostOnly is true only
+// the sessions the user streams (is host of) are closed, which is used when a user
+// stops sharing but stays in the room; otherwise every session involving the user
+// is closed, used when the user leaves the room entirely.
+//
+// This is the single entry point for "a participant leaves a session and the peer
+// must be told". It funnels through closeSession, the one place that releases TURN
+// credentials and records the session-closed metric, so notification, metrics and
+// credential release stay consistent across the different exit scenarios.
+func (r *Room) closeUserSessions(rooms *Rooms, user xid.ID, hostOnly bool) {
+	for id, session := range r.Sessions {
+		if hostOnly && session.Host != user {
+			continue
+		}
+		peerID, ok := session.peer(user)
+		if !ok {
+			continue
+		}
+		if peerUser, ok := r.Users[peerID]; ok {
+			peerUser.WriteTimeout(outgoing.EndShare(id))
+		}
+		r.closeSession(rooms, id)
+	}
+}
+
 type RoomSession struct {
 	Host   xid.ID
 	Client xid.ID
+}
+
+// peer returns the other participant of the session relative to user and reports
+// whether user actually takes part in this session.
+func (s *RoomSession) peer(user xid.ID) (xid.ID, bool) {
+	switch user {
+	case s.Host:
+		return s.Client, true
+	case s.Client:
+		return s.Host, true
+	default:
+		return xid.ID{}, false
+	}
 }
 
 func (r *Room) notifyInfoChanged() {
