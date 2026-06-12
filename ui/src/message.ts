@@ -51,7 +51,6 @@ export interface ICEServer {
 
 export interface RoomInfo {
     id: string;
-    share: ShareMode;
     mode: RoomMode;
     users: RoomUser[];
 }
@@ -62,6 +61,18 @@ export interface RoomUser {
     streaming: boolean;
     you: boolean;
     owner: boolean;
+    shareMode: ShareMode;
+    selected: boolean;
+}
+
+export interface ShareOptions {
+    mode: ShareMode;
+    selectedUsers?: string[];
+}
+
+export interface UpdateSelectedPayload {
+    add?: string[];
+    remove?: string[];
 }
 
 export interface P2PMessage<T> {
@@ -78,8 +89,9 @@ export type HostICECandidate = Typed<P2PMessage<RTCIceCandidate>, 'hostice'>;
 export type ClientICECandidate = Typed<P2PMessage<RTCIceCandidate>, 'clientice'>;
 export type HostOffer = Typed<P2PMessage<RTCSessionDescriptionInit>, 'hostoffer'>;
 export type ClientAnswer = Typed<P2PMessage<RTCSessionDescriptionInit>, 'clientanswer'>;
-export type StartSharing = Typed<{}, 'share'>;
+export type StartSharing = Typed<ShareOptions, 'share'>;
 export type StopShare = Typed<{}, 'stopshare'>;
+export type UpdateSelected = Typed<UpdateSelectedPayload, 'updateselected'>;
 export type RoomCreate = Typed<RoomConfiguration & {joinIfExist?: boolean}, 'create'>;
 export type JoinRoom = Typed<JoinConfiguration, 'join'>;
 export type EndShare = Typed<string, 'endshare'>;
@@ -104,4 +116,5 @@ export type OutgoingMessage =
     | HostOffer
     | StopShare
     | ClientAnswer
-    | StartSharing;
+    | StartSharing
+    | UpdateSelected;

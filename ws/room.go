@@ -12,6 +12,13 @@ import (
 	"github.com/screego/server/ws/outgoing"
 )
 
+type ShareMode string
+
+const (
+	ShareModeEveryone ShareMode = "Everyone"
+	ShareModeSelected ShareMode = "Selected"
+)
+
 type ConnectionMode string
 
 const (
@@ -100,12 +107,19 @@ func (r *Room) notifyInfoChanged() {
 	for _, current := range r.Users {
 		users := []outgoing.User{}
 		for _, user := range r.Users {
+			shareMode := string(user.ShareMode)
+			if shareMode == "" {
+				shareMode = string(ShareModeEveryone)
+			}
+			selected := user.isSelected(current.ID)
 			users = append(users, outgoing.User{
 				ID:        user.ID,
 				Name:      user.Name,
 				Streaming: user.Streaming,
 				You:       current == user,
 				Owner:     user.Owner,
+				ShareMode: shareMode,
+				Selected:  selected,
 			})
 		}
 
@@ -132,12 +146,32 @@ func (r *Room) notifyInfoChanged() {
 }
 
 type User struct {
-	ID        xid.ID
-	Addr      net.IP
-	Name      string
-	Streaming bool
-	Owner     bool
-	_write    chan<- outgoing.Message
+	ID              xid.ID
+	Addr            net.IP
+	Name            string
+	Streaming       bool
+	Owner           bool
+	ShareMode       ShareMode
+	SelectedViewers map[xid.ID]bool
+	_write          chan<- outgoing.Message
+}
+
+func (u *User) isSelected(viewerID xid.ID) bool {
+	if u.ShareMode == ShareModeEveryone || u.ShareMode == "" {
+		return true
+	}
+	return u.SelectedViewers[viewerID]
+}
+
+func (u *User) addSelectedViewer(id xid.ID) {
+	if u.SelectedViewers == nil {
+		u.SelectedViewers = make(map[xid.ID]bool)
+	}
+	u.SelectedViewers[id] = true
+}
+
+func (u *User) removeSelectedViewer(id xid.ID) {
+	delete(u.SelectedViewers, id)
 }
 
 func (u *User) WriteTimeout(msg outgoing.Message) {

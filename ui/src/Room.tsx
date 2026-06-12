@@ -1,5 +1,28 @@
 import React, {useCallback} from 'react';
-import {Badge, Box, IconButton, Paper, Tooltip, Typography, Slider, Stack} from '@mui/material';
+import {
+    Badge,
+    Box,
+    Button,
+    Checkbox,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    FormControlLabel,
+    IconButton,
+    List,
+    ListItem,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
+    Paper,
+    Radio,
+    RadioGroup,
+    Tooltip,
+    Typography,
+    Slider,
+    Stack,
+} from '@mui/material';
 import CancelPresentationIcon from '@mui/icons-material/CancelPresentation';
 import PresentToAllIcon from '@mui/icons-material/PresentToAll';
 import FullScreenIcon from '@mui/icons-material/Fullscreen';
@@ -7,12 +30,14 @@ import PeopleIcon from '@mui/icons-material/People';
 import VolumeMuteIcon from '@mui/icons-material/VolumeOff';
 import VolumeIcon from '@mui/icons-material/VolumeUp';
 import SettingsIcon from '@mui/icons-material/Settings';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import {useHotkeys} from 'react-hotkeys-hook';
 import {Video} from './Video';
 import {makeStyles} from 'tss-react/mui';
 import {ConnectedRoom} from './useRoom';
 import {useSnackbar} from 'notistack';
-import {RoomUser} from './message';
+import {RoomUser, ShareMode, ShareOptions} from './message';
 import {useSettings, VideoDisplayMode} from './settings';
 import {SettingDialog} from './SettingDialog';
 
@@ -58,14 +83,17 @@ export const Room = ({
     share,
     stopShare,
     setName,
+    updateSelected,
 }: {
     state: ConnectedRoom;
-    share: () => void;
+    share: (options?: ShareOptions) => void;
     stopShare: () => void;
     setName: (name: string) => void;
+    updateSelected: (add: string[], remove: string[]) => void;
 }) => {
     const {classes} = useStyles();
     const [open, setOpen] = React.useState(false);
+    const [shareDialogOpen, setShareDialogOpen] = React.useState(false);
     const {enqueueSnackbar} = useSnackbar();
     const [settings, setSettings] = useSettings();
     const [showControl, setShowControl] = React.useState(true);
@@ -183,6 +211,17 @@ export const Room = ({
         [videoElement]
     );
 
+    const currentUser = state.users.find((u) => u.you);
+    const isSharingSelected = state.hostStream && currentUser?.shareMode === ShareMode.Selected;
+
+    const handleToggleViewer = (userId: string, isSelected: boolean) => {
+        if (isSelected) {
+            updateSelected([], [userId]);
+        } else {
+            updateSelected([userId], []);
+        }
+    };
+
     const videoClasses = () => {
         switch (settings.displayMode) {
             case VideoDisplayMode.FitToWindow:
@@ -249,7 +288,7 @@ export const Room = ({
                             </Tooltip>
                         ) : (
                             <Tooltip title="Start Presentation" arrow>
-                                <IconButton onClick={share} size="large">
+                                <IconButton onClick={() => setShareDialogOpen(true)} size="large">
                                     <PresentToAllIcon fontSize="large" />
                                 </IconButton>
                             </Tooltip>
@@ -261,9 +300,40 @@ export const Room = ({
                                 <div>
                                     <Typography variant="h5">Member List</Typography>
                                     {state.users.map((user) => (
-                                        <Typography key={user.id}>
-                                            {user.name} {flags(user)}
-                                        </Typography>
+                                        <Stack
+                                            key={user.id}
+                                            direction="row"
+                                            spacing={1}
+                                            sx={{alignItems: 'center'}}
+                                        >
+                                            <Typography>
+                                                {user.name} {flags(user)}
+                                            </Typography>
+                                            {isSharingSelected && !user.you && (
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleViewer(
+                                                            user.id,
+                                                            user.selected
+                                                        );
+                                                    }}
+                                                >
+                                                    {user.selected ? (
+                                                        <PersonRemoveIcon
+                                                            fontSize="small"
+                                                            color="error"
+                                                        />
+                                                    ) : (
+                                                        <PersonAddIcon
+                                                            fontSize="small"
+                                                            color="success"
+                                                        />
+                                                    )}
+                                                </IconButton>
+                                            )}
+                                        </Stack>
                                     ))}
                                 </div>
                             }
@@ -344,6 +414,16 @@ export const Room = ({
                     saveSettings={setSettings}
                 />
             </div>
+
+            <ShareDialog
+                open={shareDialogOpen}
+                users={state.users}
+                onClose={() => setShareDialogOpen(false)}
+                onShare={(options) => {
+                    setShareDialogOpen(false);
+                    share(options);
+                }}
+            />
         </div>
     );
 };
@@ -409,6 +489,113 @@ const AudioControl = ({video}: {video: FullScreenHTMLVideoElement}) => {
                 }}
             />
         </Stack>
+    );
+};
+
+const ShareDialog = ({
+    open,
+    users,
+    onClose,
+    onShare,
+}: {
+    open: boolean;
+    users: RoomUser[];
+    onClose: () => void;
+    onShare: (options: ShareOptions) => void;
+}) => {
+    const [mode, setMode] = React.useState<ShareMode>(ShareMode.Everyone);
+    const [selected, setSelected] = React.useState<Set<string>>(new Set());
+
+    React.useEffect(() => {
+        if (open) {
+            setMode(ShareMode.Everyone);
+            setSelected(new Set());
+        }
+    }, [open]);
+
+    const otherUsers = users.filter((u) => !u.you);
+
+    const handleToggle = (userId: string) => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(userId)) {
+                next.delete(userId);
+            } else {
+                next.add(userId);
+            }
+            return next;
+        });
+    };
+
+    const handleShare = () => {
+        if (mode === ShareMode.Everyone) {
+            onShare({mode: ShareMode.Everyone});
+        } else {
+            onShare({mode: ShareMode.Selected, selectedUsers: Array.from(selected)});
+        }
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+            <DialogTitle>Start Presentation</DialogTitle>
+            <DialogContent>
+                <RadioGroup
+                    value={mode}
+                    onChange={(_, value) => setMode(value as ShareMode)}
+                >
+                    <FormControlLabel
+                        value={ShareMode.Everyone}
+                        control={<Radio />}
+                        label="Share with everyone in the room"
+                    />
+                    <FormControlLabel
+                        value={ShareMode.Selected}
+                        control={<Radio />}
+                        label="Share with selected members only"
+                    />
+                </RadioGroup>
+                {mode === ShareMode.Selected && (
+                    <List>
+                        {otherUsers.map((user) => (
+                            <ListItem key={user.id} disablePadding>
+                                <ListItemButton
+                                    onClick={() => handleToggle(user.id)}
+                                    dense
+                                >
+                                    <ListItemIcon>
+                                        <Checkbox
+                                            edge="start"
+                                            checked={selected.has(user.id)}
+                                            tabIndex={-1}
+                                            disableRipple
+                                        />
+                                    </ListItemIcon>
+                                    <ListItemText primary={user.name} />
+                                </ListItemButton>
+                            </ListItem>
+                        ))}
+                        {otherUsers.length === 0 && (
+                            <ListItem>
+                                <ListItemText
+                                    secondary="No other members in the room"
+                                    sx={{textAlign: 'center'}}
+                                />
+                            </ListItem>
+                        )}
+                    </List>
+                )}
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button
+                    onClick={handleShare}
+                    variant="contained"
+                    disabled={mode === ShareMode.Selected && selected.size === 0}
+                >
+                    Start
+                </Button>
+            </DialogActions>
+        </Dialog>
     );
 };
 

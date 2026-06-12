@@ -22,6 +22,8 @@ type User struct {
 	Streaming bool   `json:"streaming"`
 	You       bool   `json:"you"`
 	Owner     bool   `json:"owner"`
+	ShareMode string `json:"shareMode"`
+	Selected  bool   `json:"selected"`
 }
 
 func (Room) Type() string {

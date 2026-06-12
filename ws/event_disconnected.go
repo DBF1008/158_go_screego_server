@@ -59,6 +59,12 @@ func (e *Disconnected) executeNoError(rooms *Rooms, current ClientInfo) {
 		}
 	}
 
+	for _, member := range room.Users {
+		if member.Streaming {
+			member.removeSelectedViewer(current.ID)
+		}
+	}
+
 	if user.Owner && room.CloseOnOwnerLeave {
 		for _, member := range room.Users {
 			delete(rooms.connected, member.ID)

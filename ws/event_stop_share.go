@@ -20,7 +20,11 @@ func (e *StopShare) Execute(rooms *Rooms, current ClientInfo) error {
 		return err
 	}
 
-	room.Users[current.ID].Streaming = false
+	user := room.Users[current.ID]
+	user.Streaming = false
+	user.ShareMode = ShareModeEveryone
+	user.SelectedViewers = nil
+
 	for id, session := range room.Sessions {
 		if bytes.Equal(session.Host.Bytes(), current.ID.Bytes()) {
 			client, ok := room.Users[session.Client]

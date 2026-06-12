@@ -8,6 +8,8 @@ import {
     OutgoingMessage,
     RoomCreate,
     RoomInfo,
+    ShareMode,
+    ShareOptions,
     UIConfig,
 } from './message';
 import {loadSettings, resolveCodecPlaceholder} from './settings';
@@ -31,9 +33,10 @@ interface ClientStream {
 export interface UseRoom {
     state: RoomState;
     room: FCreateRoom;
-    share: () => void;
+    share: (options?: ShareOptions) => void;
     setName: (name: string) => void;
     stopShare: () => void;
+    updateSelected: (add: string[], remove: string[]) => void;
 }
 
 const relayConfig: Partial<RTCConfiguration> =
@@ -319,7 +322,7 @@ export const useRoom = (config: UIConfig): UseRoom => {
         [setState, enqueueSnackbar, setRoomID]
     );
 
-    const share = async () => {
+    const share = async (options?: ShareOptions) => {
         if (!navigator.mediaDevices) {
             enqueueSnackbar(
                 'Could not start presentation. Are you using https? (mediaDevices undefined)',
@@ -358,7 +361,8 @@ export const useRoom = (config: UIConfig): UseRoom => {
         stream.current?.getVideoTracks()[0].addEventListener('ended', () => stopShare());
         setState((current) => (current ? {...current, hostStream: stream.current} : current));
 
-        conn.current?.send(JSON.stringify({type: 'share', payload: {}}));
+        const shareOptions: ShareOptions = options ?? {mode: ShareMode.Everyone};
+        conn.current?.send(JSON.stringify({type: 'share', payload: shareOptions}));
     };
 
     const stopShare = async () => {
@@ -374,6 +378,12 @@ export const useRoom = (config: UIConfig): UseRoom => {
 
     const setName = (name: string): void => {
         conn.current?.send(JSON.stringify({type: 'name', payload: {username: name}}));
+    };
+
+    const updateSelected = (add: string[], remove: string[]): void => {
+        conn.current?.send(
+            JSON.stringify({type: 'updateselected', payload: {add, remove}})
+        );
     };
 
     React.useEffect(() => {
@@ -401,5 +411,5 @@ export const useRoom = (config: UIConfig): UseRoom => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    return {state, room, share, stopShare, setName};
+    return {state, room, share, stopShare, setName, updateSelected};
 };
