@@ -1,5 +1,9 @@
 package ws
 
+import (
+	"errors"
+)
+
 func init() {
 	register("name", func() Event {
 		return &Name{}
@@ -11,6 +15,10 @@ type Name struct {
 }
 
 func (e *Name) Execute(rooms *Rooms, current ClientInfo) error {
+	if current.Authenticated {
+		return errors.New("authenticated users cannot change their name")
+	}
+
 	room, err := rooms.CurrentRoom(current)
 	if err != nil {
 		return err
