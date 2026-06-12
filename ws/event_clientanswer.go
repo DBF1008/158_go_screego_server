@@ -1,9 +1,6 @@
 package ws
 
 import (
-	"fmt"
-
-	"github.com/rs/zerolog/log"
 	"github.com/screego/server/ws/outgoing"
 )
 
@@ -16,23 +13,7 @@ func init() {
 type ClientAnswer outgoing.P2PMessage
 
 func (e *ClientAnswer) Execute(rooms *Rooms, current ClientInfo) error {
-	room, err := rooms.CurrentRoom(current)
-	if err != nil {
-		return err
-	}
-
-	session, ok := room.Sessions[e.SID]
-
-	if !ok {
-		log.Debug().Str("id", e.SID.String()).Msg("unknown session")
-		return nil
-	}
-
-	if session.Client != current.ID {
-		return fmt.Errorf("permission denied for session %s", e.SID)
-	}
-
-	room.Users[session.Host].WriteTimeout(outgoing.ClientAnswer(*e))
-
-	return nil
+	return forwardP2P(rooms, current, outgoing.P2PMessage(*e), false, func(m outgoing.P2PMessage) outgoing.Message {
+		return outgoing.ClientAnswer(m)
+	})
 }
