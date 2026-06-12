@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -104,7 +105,12 @@ func (r *Rooms) Start() {
 		}
 
 		if err := msg.Incoming.Execute(r, msg.Info); err != nil {
-			dis := Disconnected{Code: websocket.CloseNormalClosure, Reason: err.Error()}
+			code := websocket.CloseNormalClosure
+			var ce CloseError
+			if errors.As(err, &ce) {
+				code = ce.Code
+			}
+			dis := Disconnected{Code: code, Reason: err.Error()}
 			dis.executeNoError(r, msg.Info)
 		}
 	}

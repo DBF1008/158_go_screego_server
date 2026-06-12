@@ -22,6 +22,7 @@ const (
 
 type Room struct {
 	ID                string
+	Passphrase        string
 	CloseOnOwnerLeave bool
 	Mode              ConnectionMode
 	Users             map[xid.ID]*User

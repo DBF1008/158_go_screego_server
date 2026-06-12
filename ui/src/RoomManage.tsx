@@ -21,6 +21,7 @@ const CreateRoom = ({room, config}: Pick<UseRoom, 'room'> & {config: UIConfig}) 
     const [id, setId] = React.useState(() => getRoomFromURL() ?? config.roomName);
     const mode = authModeToRoomMode(config.authMode, config.loggedIn);
     const [ownerLeave, setOwnerLeave] = React.useState(config.closeRoomWhenOwnerLeaves);
+    const [password, setPassword] = React.useState('');
     const submit = () =>
         room({
             type: 'create',
@@ -29,6 +30,7 @@ const CreateRoom = ({room, config}: Pick<UseRoom, 'room'> & {config: UIConfig}) 
                 closeOnOwnerLeave: ownerLeave,
                 joinIfExist: true,
                 id: id || undefined,
+                password: password || undefined,
             },
         });
     return (
@@ -40,6 +42,15 @@ const CreateRoom = ({room, config}: Pick<UseRoom, 'room'> & {config: UIConfig}) 
                     onChange={(e) => setId(e.target.value)}
                     label="id"
                     margin="dense"
+                />
+                <TextField
+                    fullWidth
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    label="Access passphrase (optional)"
+                    margin="dense"
+                    autoComplete="new-password"
                 />
                 <FormControlLabel
                     control={

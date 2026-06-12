@@ -14,6 +14,18 @@ import {loadSettings, resolveCodecPlaceholder} from './settings';
 import {urlWithSlash} from './url';
 import {authModeToRoomMode} from './useConfig';
 import {getFromURL, useRoomID} from './useRoomID';
+import {PasswordRequired} from './PasswordPrompt';
+
+const CLOSE_PASSPHRASE_REQUIRED = 4001;
+
+const passKey = (id: string): string => `screego-room-pass-${id}`;
+const storePass = (id: string, pass?: string): void => {
+    if (pass) {
+        sessionStorage.setItem(passKey(id), pass);
+    }
+};
+const loadPass = (id: string): string | undefined =>
+    sessionStorage.getItem(passKey(id)) ?? undefined;
 
 export type RoomState = false | ConnectedRoom;
 export type ConnectedRoom = {
@@ -34,6 +46,7 @@ export interface UseRoom {
     share: () => void;
     setName: (name: string) => void;
     stopShare: () => void;
+    passwordRequired?: PasswordRequired;
 }
 
 const relayConfig: Partial<RTCConfiguration> =
@@ -168,6 +181,9 @@ export const useRoom = (config: UIConfig): UseRoom => {
     const stream = React.useRef<MediaStream>(undefined);
 
     const [state, setState] = React.useState<RoomState>(false);
+    const [passwordRequired, setPasswordRequired] = React.useState<PasswordRequired | undefined>(
+        undefined
+    );
 
     const room: FCreateRoom = React.useCallback(
         (create) => {
@@ -187,6 +203,8 @@ export const useRoom = (config: UIConfig): UseRoom => {
                             resolve();
                             setState({ws, ...event.payload, clientStreams: []});
                             setRoomID(event.payload.id);
+                            storePass(event.payload.id, create.payload.password);
+                            setPasswordRequired(undefined);
                         } else {
                             resolve();
                             enqueueSnackbar('Unknown Event: ' + event.type, {variant: 'error'});
@@ -299,6 +317,14 @@ export const useRoom = (config: UIConfig): UseRoom => {
                         resolve();
                         first = false;
                     }
+                    if (event.code === CLOSE_PASSPHRASE_REQUIRED && create.payload.id) {
+                        setPasswordRequired({
+                            id: create.payload.id,
+                            rejected: Boolean(create.payload.password),
+                        });
+                        setState(false);
+                        return;
+                    }
                     enqueueSnackbar(event.reason, {variant: 'error', persist: true});
                     setState(false);
                 };
@@ -316,7 +342,7 @@ export const useRoom = (config: UIConfig): UseRoom => {
                 };
             });
         },
-        [setState, enqueueSnackbar, setRoomID]
+        [setState, enqueueSnackbar, setRoomID, setPasswordRequired]
     );
 
     const share = async () => {
@@ -392,14 +418,15 @@ export const useRoom = (config: UIConfig): UseRoom => {
                         closeOnOwnerLeave,
                         id: roomID,
                         mode: authModeToRoomMode(config.authMode, config.loggedIn),
+                        password: loadPass(roomID),
                     },
                 });
             } else {
-                room({type: 'join', payload: {id: roomID}});
+                room({type: 'join', payload: {id: roomID, password: loadPass(roomID)}});
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    return {state, room, share, stopShare, setName};
+    return {state, room, share, stopShare, setName, passwordRequired};
 };

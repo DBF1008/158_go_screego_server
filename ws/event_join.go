@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"crypto/subtle"
 	"fmt"
 )
 
@@ -13,6 +14,7 @@ func init() {
 type Join struct {
 	ID       string `json:"id"`
 	UserName string `json:"username,omitempty"`
+	Password secret `json:"password,omitempty"`
 }
 
 func (e *Join) Execute(rooms *Rooms, current ClientInfo) error {
@@ -24,6 +26,13 @@ func (e *Join) Execute(rooms *Rooms, current ClientInfo) error {
 	if !ok {
 		return fmt.Errorf("room with id %s does not exist", e.ID)
 	}
+
+	if room.Passphrase != "" && !current.Authenticated {
+		if subtle.ConstantTimeCompare([]byte(room.Passphrase), []byte(string(e.Password))) != 1 {
+			return CloseError{Code: ClosePassphraseRequired, Reason: "invalid room passphrase"}
+		}
+	}
+
 	name := e.UserName
 	if current.Authenticated {
 		name = current.AuthenticatedUser
