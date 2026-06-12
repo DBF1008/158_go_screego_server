@@ -106,6 +106,7 @@ func (r *Room) notifyInfoChanged() {
 				Streaming: user.Streaming,
 				You:       current == user,
 				Owner:     user.Owner,
+				Share:     user.shareMode(),
 			})
 		}
 
@@ -137,7 +138,29 @@ type User struct {
 	Name      string
 	Streaming bool
 	Owner     bool
-	_write    chan<- outgoing.Message
+	// ShareAllowList controls who receives this user's stream while Streaming.
+	// A nil list means broadcast to everyone (the default); a non-nil list
+	// restricts the stream to the contained user ids (targeted sharing).
+	ShareAllowList map[xid.ID]bool
+	_write         chan<- outgoing.Message
+}
+
+// shares reports whether this user shares their stream with the given target.
+// With a nil ShareAllowList the user broadcasts to everyone; otherwise only
+// members present in the list receive the stream.
+func (u *User) shares(target xid.ID) bool {
+	if u.ShareAllowList == nil {
+		return true
+	}
+	return u.ShareAllowList[target]
+}
+
+// shareMode returns the sharing mode surfaced to clients in the room info.
+func (u *User) shareMode() outgoing.ShareMode {
+	if u.ShareAllowList == nil {
+		return outgoing.ShareEveryone
+	}
+	return outgoing.ShareSelected
 }
 
 func (u *User) WriteTimeout(msg outgoing.Message) {

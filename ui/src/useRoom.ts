@@ -31,7 +31,7 @@ interface ClientStream {
 export interface UseRoom {
     state: RoomState;
     room: FCreateRoom;
-    share: () => void;
+    share: (targets?: string[]) => void;
     setName: (name: string) => void;
     stopShare: () => void;
 }
@@ -319,7 +319,7 @@ export const useRoom = (config: UIConfig): UseRoom => {
         [setState, enqueueSnackbar, setRoomID]
     );
 
-    const share = async () => {
+    const share = async (targets?: string[]) => {
         if (!navigator.mediaDevices) {
             enqueueSnackbar(
                 'Could not start presentation. Are you using https? (mediaDevices undefined)',
@@ -358,7 +358,7 @@ export const useRoom = (config: UIConfig): UseRoom => {
         stream.current?.getVideoTracks()[0].addEventListener('ended', () => stopShare());
         setState((current) => (current ? {...current, hostStream: stream.current} : current));
 
-        conn.current?.send(JSON.stringify({type: 'share', payload: {}}));
+        conn.current?.send(JSON.stringify({type: 'share', payload: {targets}}));
     };
 
     const stopShare = async () => {

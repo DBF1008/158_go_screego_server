@@ -17,12 +17,23 @@ type Room struct {
 }
 
 type User struct {
-	ID        xid.ID `json:"id"`
-	Name      string `json:"name"`
-	Streaming bool   `json:"streaming"`
-	You       bool   `json:"you"`
-	Owner     bool   `json:"owner"`
+	ID        xid.ID    `json:"id"`
+	Name      string    `json:"name"`
+	Streaming bool      `json:"streaming"`
+	You       bool      `json:"you"`
+	Owner     bool      `json:"owner"`
+	Share     ShareMode `json:"share"`
 }
+
+// ShareMode describes who a streaming user shares their screen with.
+type ShareMode string
+
+const (
+	// ShareEveryone broadcasts the stream to every member of the room (default).
+	ShareEveryone ShareMode = "Everyone"
+	// ShareSelected restricts the stream to an explicit set of members.
+	ShareSelected ShareMode = "Selected"
+)
 
 func (Room) Type() string {
 	return "room"

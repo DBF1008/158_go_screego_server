@@ -12,7 +12,8 @@ import {Video} from './Video';
 import {makeStyles} from 'tss-react/mui';
 import {ConnectedRoom} from './useRoom';
 import {useSnackbar} from 'notistack';
-import {RoomUser} from './message';
+import {RoomUser, ShareMode} from './message';
+import {SharePicker} from './SharePicker';
 import {useSettings, VideoDisplayMode} from './settings';
 import {SettingDialog} from './SettingDialog';
 
@@ -28,6 +29,9 @@ const flags = (user: RoomUser) => {
     }
     if (user.streaming) {
         result.push('Streaming');
+        if (user.share === ShareMode.Selected) {
+            result.push('Selected');
+        }
     }
     if (!result.length) {
         return '';
@@ -60,12 +64,13 @@ export const Room = ({
     setName,
 }: {
     state: ConnectedRoom;
-    share: () => void;
+    share: (targets?: string[]) => void;
     stopShare: () => void;
     setName: (name: string) => void;
 }) => {
     const {classes} = useStyles();
     const [open, setOpen] = React.useState(false);
+    const [shareAnchor, setShareAnchor] = React.useState<HTMLElement | null>(null);
     const {enqueueSnackbar} = useSnackbar();
     const [settings, setSettings] = useSettings();
     const [showControl, setShowControl] = React.useState(true);
@@ -249,11 +254,21 @@ export const Room = ({
                             </Tooltip>
                         ) : (
                             <Tooltip title="Start Presentation" arrow>
-                                <IconButton onClick={share} size="large">
+                                <IconButton
+                                    onClick={(e) => setShareAnchor(e.currentTarget)}
+                                    size="large"
+                                >
                                     <PresentToAllIcon fontSize="large" />
                                 </IconButton>
                             </Tooltip>
                         )}
+
+                        <SharePicker
+                            users={state.users}
+                            anchorEl={shareAnchor}
+                            onClose={() => setShareAnchor(null)}
+                            onShare={share}
+                        />
 
                         <Tooltip
                             classes={{tooltip: classes.noMaxWidth}}

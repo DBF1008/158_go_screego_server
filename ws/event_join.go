@@ -53,6 +53,10 @@ func (e *Join) Execute(rooms *Rooms, current ClientInfo) error {
 		if current.ID == user.ID || !user.Streaming {
 			continue
 		}
+		if !user.shares(current.ID) {
+			// Targeted share that does not include this newly joined member.
+			continue
+		}
 		room.newSession(user.ID, current.ID, rooms, v4, v6)
 	}
 
