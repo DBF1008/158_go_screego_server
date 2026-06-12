@@ -1,5 +1,9 @@
 package ws
 
+import (
+	"github.com/rs/zerolog/log"
+)
+
 func init() {
 	register("share", func() Event {
 		return &StartShare{}
@@ -14,12 +18,20 @@ func (e *StartShare) Execute(rooms *Rooms, current ClientInfo) error {
 		return err
 	}
 
-	room.Users[current.ID].Streaming = true
-
+	// Resolve the TURN/STUN addresses before mutating any room state. This call
+	// can fail transiently (e.g. the external TURN address is resolved via DNS).
+	// Such a failure must only abort this single share attempt: returning an
+	// error here would propagate to Rooms.Start and tear down the whole
+	// WebSocket, dropping the user from the room and disrupting everyone else.
+	// Instead we log it and leave the room untouched, so the user stays
+	// connected, is not marked as streaming, and can simply retry.
 	v4, v6, err := rooms.config.TurnIPProvider.Get()
 	if err != nil {
-		return err
+		log.Warn().Err(err).Str("id", current.ID.String()).Msg("cannot start share, could not resolve turn address")
+		return nil
 	}
+
+	room.Users[current.ID].Streaming = true
 
 	for _, user := range room.Users {
 		if current.ID == user.ID {
