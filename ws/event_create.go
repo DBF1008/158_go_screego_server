@@ -19,6 +19,7 @@ type Create struct {
 	Mode              ConnectionMode `json:"mode"`
 	CloseOnOwnerLeave bool           `json:"closeOnOwnerLeave"`
 	UserName          string         `json:"username"`
+	Password          string         `json:"password,omitempty"`
 	JoinIfExist       bool           `json:"joinIfExist,omitempty"`
 }
 
@@ -29,7 +30,7 @@ func (e *Create) Execute(rooms *Rooms, current ClientInfo) error {
 
 	if _, ok := rooms.Rooms[e.ID]; ok {
 		if e.JoinIfExist {
-			join := &Join{UserName: e.UserName, ID: e.ID}
+			join := &Join{UserName: e.UserName, ID: e.ID, Password: e.Password}
 			return join.Execute(rooms, current)
 		}
 
@@ -62,6 +63,7 @@ func (e *Create) Execute(rooms *Rooms, current ClientInfo) error {
 		ID:                e.ID,
 		CloseOnOwnerLeave: e.CloseOnOwnerLeave,
 		Mode:              e.Mode,
+		Password:          e.Password,
 		Sessions:          map[xid.ID]*RoomSession{},
 		Users: map[xid.ID]*User{
 			current.ID: {

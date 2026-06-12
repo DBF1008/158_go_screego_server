@@ -19,6 +19,7 @@ export interface RoomConfiguration {
     closeOnOwnerLeave?: boolean;
     mode: RoomMode;
     username?: string;
+    password?: string;
 }
 
 export enum RoomMode {

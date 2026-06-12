@@ -13,6 +13,7 @@ func init() {
 type Join struct {
 	ID       string `json:"id"`
 	UserName string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 func (e *Join) Execute(rooms *Rooms, current ClientInfo) error {
@@ -24,6 +25,14 @@ func (e *Join) Execute(rooms *Rooms, current ClientInfo) error {
 	if !ok {
 		return fmt.Errorf("room with id %s does not exist", e.ID)
 	}
+
+	if room.HasPassword() && !room.ValidatePassword(e.Password) {
+		if e.Password == "" {
+			return fmt.Errorf("room requires a password")
+		}
+		return fmt.Errorf("invalid password")
+	}
+
 	name := e.UserName
 	if current.Authenticated {
 		name = current.AuthenticatedUser

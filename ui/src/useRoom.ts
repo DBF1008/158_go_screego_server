@@ -14,6 +14,7 @@ import {loadSettings, resolveCodecPlaceholder} from './settings';
 import {urlWithSlash} from './url';
 import {authModeToRoomMode} from './useConfig';
 import {getFromURL, useRoomID} from './useRoomID';
+import {storeRoomPassword, getRoomPassword, clearRoomPassword} from './passwordStorage';
 
 export type RoomState = false | ConnectedRoom;
 export type ConnectedRoom = {
@@ -34,6 +35,15 @@ export interface UseRoom {
     share: () => void;
     setName: (name: string) => void;
     stopShare: () => void;
+    passwordPrompt: PasswordPromptState;
+    submitPassword: (password: string) => void;
+    cancelPassword: () => void;
+}
+
+export interface PasswordPromptState {
+    open: boolean;
+    roomId: string;
+    error?: string;
 }
 
 const relayConfig: Partial<RTCConfiguration> =
@@ -166,8 +176,14 @@ export const useRoom = (config: UIConfig): UseRoom => {
     const host = React.useRef<Record<string, RTCPeerConnection>>({});
     const client = React.useRef<Record<string, RTCPeerConnection>>({});
     const stream = React.useRef<MediaStream>(undefined);
+    const pendingMessage = React.useRef<RoomCreate | JoinRoom | undefined>(undefined);
+    const pendingRoomId = React.useRef<string>('');
 
     const [state, setState] = React.useState<RoomState>(false);
+    const [passwordPrompt, setPasswordPrompt] = React.useState<PasswordPromptState>({
+        open: false,
+        roomId: '',
+    });
 
     const room: FCreateRoom = React.useCallback(
         (create) => {
@@ -187,6 +203,11 @@ export const useRoom = (config: UIConfig): UseRoom => {
                             resolve();
                             setState({ws, ...event.payload, clientStreams: []});
                             setRoomID(event.payload.id);
+                            // Cache password on successful join
+                            const pw = (create.payload as {password?: string}).password;
+                            if (pw) {
+                                storeRoomPassword(event.payload.id, pw);
+                            }
                         } else {
                             resolve();
                             enqueueSnackbar('Unknown Event: ' + event.type, {variant: 'error'});
@@ -299,6 +320,19 @@ export const useRoom = (config: UIConfig): UseRoom => {
                         resolve();
                         first = false;
                     }
+                    if (event.reason === 'room requires a password') {
+                        setPasswordPrompt({open: true, roomId: pendingRoomId.current});
+                        return;
+                    }
+                    if (event.reason === 'invalid password') {
+                        clearRoomPassword(pendingRoomId.current);
+                        setPasswordPrompt({
+                            open: true,
+                            roomId: pendingRoomId.current,
+                            error: 'Invalid password',
+                        });
+                        return;
+                    }
                     enqueueSnackbar(event.reason, {variant: 'error', persist: true});
                     setState(false);
                 };
@@ -312,6 +346,17 @@ export const useRoom = (config: UIConfig): UseRoom => {
                 };
                 ws.onopen = () => {
                     create.payload.username = loadSettings().name;
+                    const currentRoomId = (create.payload as {id?: string}).id ?? '';
+                    pendingRoomId.current = currentRoomId;
+                    pendingMessage.current = create;
+                    // Auto-include cached password from sessionStorage
+                    const pw = (create.payload as {password?: string}).password;
+                    if (!pw && currentRoomId) {
+                        const cached = getRoomPassword(currentRoomId);
+                        if (cached) {
+                            (create.payload as {password?: string}).password = cached;
+                        }
+                    }
                     send(create);
                 };
             });
@@ -376,6 +421,22 @@ export const useRoom = (config: UIConfig): UseRoom => {
         conn.current?.send(JSON.stringify({type: 'name', payload: {username: name}}));
     };
 
+    const submitPassword = React.useCallback(
+        (password: string) => {
+            if (pendingMessage.current) {
+                (pendingMessage.current.payload as {password?: string}).password = password;
+                setPasswordPrompt({open: false, roomId: ''});
+                room(pendingMessage.current);
+            }
+        },
+        [room]
+    );
+
+    const cancelPassword = React.useCallback(() => {
+        setPasswordPrompt({open: false, roomId: ''});
+        pendingMessage.current = undefined;
+    }, []);
+
     React.useEffect(() => {
         if (roomID) {
             const create = getFromURL('create') === 'true';
@@ -401,5 +462,5 @@ export const useRoom = (config: UIConfig): UseRoom => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    return {state, room, share, stopShare, setName};
+    return {state, room, share, stopShare, setName, passwordPrompt, submitPassword, cancelPassword};
 };

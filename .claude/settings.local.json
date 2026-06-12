@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash -c 'npx tsc --noEmit 2>&1 && echo \"=== TypeScript OK ===\" && npx vite build 2>&1 && echo \"=== Build OK ===\"')"
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net"
 	"sort"
@@ -24,8 +25,20 @@ type Room struct {
 	ID                string
 	CloseOnOwnerLeave bool
 	Mode              ConnectionMode
+	Password          string
 	Users             map[xid.ID]*User
 	Sessions          map[xid.ID]*RoomSession
+}
+
+func (r *Room) HasPassword() bool {
+	return r.Password != ""
+}
+
+func (r *Room) ValidatePassword(provided string) bool {
+	if !r.HasPassword() {
+		return true
+	}
+	return subtle.ConstantTimeCompare([]byte(r.Password), []byte(provided)) == 1
 }
 
 const (
